@@ -2,18 +2,121 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>My Blog</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Static Liberal Blog</title>
   <link rel="stylesheet" href="assets/style.css">
-</head>
+  <style>
+    .shell { max-width: 1024px; margin: 0 auto; padding: 0 1rem; }
+    .nav { display: flex; align-items: center; justify-content: space-between; padding: .75rem 0; border-bottom: 1px solid #e5e7eb; position: sticky; top: 0; background: #fff; z-index: 5; }
+    .brand { display: flex; align-items: center; gap: .5rem; font-weight: 800; letter-spacing: .3px; }
+    .brand .flag { width: 22px; height: 14px; background: linear-gradient(90deg, #3b82f6 33%, #ef4444 33%, #ef4444 66%, #10b981 66%); border-radius: 2px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+    .menu { display: flex; gap: .75rem; align-items: center; }
+    .btn { padding: .4rem .7rem; border-radius: 6px; border: 1px solid #e5e7eb; background: #fff; color: #111827; cursor: pointer; }
+    .btn:hover { background: #f9fafb; }
+    .btn.primary { background: #111827; color: #fff; border-color: #111827; }
+    .btn.primary:hover { background: #0b1220; }
+    .pill { padding: .2rem .5rem; border-radius: 999px; background: #f3f4f6; font-size: .8rem; color: #374151; }
+    .hero { padding: 2rem 0 1rem; }
+    .hero h1 { margin: 0; font-size: 2rem; }
+    .subtitle { color: #4b5563; margin-top: .25rem; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; margin-top: 1rem; }
+    @media (min-width: 720px) { .grid { grid-template-columns: 1fr 1fr; } }
+    .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; background: #fff; transition: box-shadow .2s ease; }
+    .card:hover { box-shadow: 0 6px 18px rgba(0,0,0,.06); }
+    .muted { color: #6b7280; }
+    footer { text-align: center; margin: 2rem 0; color: #6b7280; }
+  </style>
+  <script type="module">
+    import { auth, provider, signInWithPopup, signOut, onAuthStateChanged, ADMIN_EMAIL } from './assets/firebase.js';
+    import { signInWithRedirect } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    const userPill = () => document.getElementById('user-pill');
+    const adminBtn = () => document.getElementById('admin-btn');
+    const signInBtn = () => document.getElementById('signin-btn');
+    const signOutBtn = () => document.getElementById('signout-btn');
+    function updateUI(user) {
+      const pill = userPill();
+      const admin = adminBtn();
+      const inBtn = signInBtn();
+      const outBtn = signOutBtn();
+      if (user) {
+        pill.textContent = user.email || user.displayName || 'Signed in';
+        pill.classList.remove('hidden');
+        outBtn.classList.remove('hidden');
+        inBtn.classList.add('hidden');
+        if (user.email === ADMIN_EMAIL) {
+          admin.classList.remove('hidden');
+        } else {
+          admin.classList.add('hidden');
+        }
+      } else {
+        pill.textContent = '';
+        pill.classList.add('hidden');
+        outBtn.classList.add('hidden');
+        inBtn.classList.remove('hidden');
+        admin.classList.add('hidden');
+      }
+    }
+    window.addEventListener('DOMContentLoaded', () => {
+      signInBtn().addEventListener('click', async () => {
+        try { await signInWithPopup(auth, provider); }
+        catch { await signInWithRedirect(auth, provider); }
+      });
+      signOutBtn().addEventListener('click', async () => { await signOut(auth); });
+      onAuthStateChanged(auth, updateUI);
+    });
+  </script>
+  </head>
 <body>
-  <header>
-    <h1>My Blog</h1>
+  <nav class="nav shell">
+    <div class="brand"><span class="flag"></span><a href="/">Static Liberal</a></div>
+    <div class="menu">
+      <a class="btn" href="/">Home</a>
+      <a class="btn" href="#">Issues</a>
+      <a class="btn" href="#">About</a>
+      <a id="admin-btn" class="btn primary hidden" href="/admin/">Admin</a>
+      <span id="user-pill" class="pill hidden"></span>
+      <button id="signin-btn" class="btn">Sign in</button>
+      <button id="signout-btn" class="btn hidden">Sign out</button>
+    </div>
+  </nav>
+
+  <header class="hero shell">
+    <h1>A blog for democratic ideas</h1>
+    <div class="subtitle">Progress, participation, and policy—made readable.</div>
   </header>
-  <main>
-    <h2>Posts</h2>
-    <ul id="posts-list"></ul>
+
+  <main class="shell">
+    <section>
+      <h2>Latest Posts</h2>
+      <div id="posts-grid" class="grid"></div>
+    </section>
   </main>
-  <footer>© 2025 My Blog</footer>
-  <script src="assets/load-posts.js"></script>
+
+  <footer>© 2025 Static Liberal</footer>
+  <script type="module">
+    import { db } from './assets/firebase.js';
+    import { collection, getDocs, orderBy, query } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    const grid = document.getElementById('posts-grid');
+    async function load() {
+      grid.innerHTML = '<div class="muted">Loading…</div>';
+      const q = query(collection(db, 'posts'), orderBy('date', 'desc'));
+      const snap = await getDocs(q);
+      grid.innerHTML = '';
+      if (snap.empty) { grid.innerHTML = '<div class="muted">No posts yet.</div>'; return; }
+      snap.forEach(d => {
+        const p = d.data();
+        const dateStr = p.date?.toDate ? p.date.toDate().toISOString().slice(0,10) : (p.date || '');
+        const card = document.createElement('article');
+        card.className = 'card';
+        card.innerHTML = `
+          <h3 style="margin:.2rem 0">${p.title || 'Untitled'}</h3>
+          <div class="muted" style="margin-bottom:.5rem">${dateStr}</div>
+          <a class="btn" href="/post.html?id=${d.id}">Read</a>
+        `;
+        grid.appendChild(card);
+      });
+    }
+    load();
+  </script>
 </body>
 </html>

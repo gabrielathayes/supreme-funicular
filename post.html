@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Post</title>
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+  <header>
+    <a href="/">← Back</a>
+    <h1 id="title">Loading…</h1>
+    <div id="meta" class="muted"></div>
+  </header>
+  <main>
+    <article id="content"></article>
+  </main>
+  <footer>© 2025 My Blog</footer>
+
+  <script type="module">
+    import { db } from './assets/firebase.js';
+    import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+    import { marked } from 'https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js';
+
+    function getParam(name) {
+      const url = new URL(window.location.href);
+      return url.searchParams.get(name);
+    }
+
+    async function load() {
+      const id = getParam('id');
+      if (!id) {
+        document.getElementById('title').textContent = 'Not found';
+        document.getElementById('content').textContent = 'Missing id parameter.';
+        return;
+      }
+      try {
+        const snap = await getDoc(doc(db, 'posts', id));
+        if (!snap.exists()) {
+          document.getElementById('title').textContent = 'Not found';
+          document.getElementById('content').textContent = 'This post does not exist.';
+          return;
+        }
+        const p = snap.data();
+        document.getElementById('title').textContent = p.title || 'Untitled';
+        const dateStr = p.date?.toDate ? p.date.toDate().toISOString().slice(0,10) : (p.date || '');
+        document.getElementById('meta').textContent = dateStr;
+        document.getElementById('content').innerHTML = marked.parse(p.body || '');
+      } catch (e) {
+        console.error(e);
+        document.getElementById('title').textContent = 'Error';
+        document.getElementById('content').textContent = 'Failed to load.';
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

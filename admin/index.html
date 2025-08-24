@@ -1,8 +1,294 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
-    <title>Content Manager</title>
-    <script src="https://unpkg.com/netlify-cms@^2.0.0/dist/netlify-cms.js"></script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin · Static Liberal</title>
+    <link rel="stylesheet" href="../assets/style.css" />
+    <style>
+      .shell { max-width: 1024px; margin: 0 auto; padding: 0 1rem; }
+      .topbar { display:flex; align-items:center; justify-content: space-between; padding: .75rem 0; border-bottom:1px solid #e5e7eb; position: sticky; top:0; background:#fff; z-index:10; }
+      .brand { display:flex; align-items:center; gap:.5rem; font-weight:800; }
+      .flag { width:22px; height:14px; background: linear-gradient(90deg, #3b82f6 33%, #ef4444 33%, #ef4444 66%, #10b981 66%); border-radius:2px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+      .menu { display:flex; gap:.5rem; align-items:center; }
+      .btn { padding: .4rem .7rem; border-radius: 6px; border: 1px solid #e5e7eb; background: #fff; color: #111827; cursor: pointer; }
+      .btn:hover { background: #f9fafb; }
+      .btn.primary { background:#111827; color:#fff; border-color:#111827; }
+      .pill { padding:.2rem .5rem; border-radius:999px; background:#f3f4f6; color:#374151; font-size:.85rem; }
+      .admin { max-width: 900px; margin: 1rem auto 2rem; padding: 0 1rem; }
+      .row { display: flex; gap: 1rem; align-items: center; }
+      input[type="text"], input[type="date"] { width: 100%; }
+      label { display:block; margin:.5rem 0 .25rem; font-weight:600; }
+      .muted { color:#6b7280; font-size:.9rem; }
+      .danger { color:#ef4444; }
+      .card { border:1px solid #e5e7eb; border-radius:10px; padding:1rem; background:#fff; }
+      .toolbar { display:flex; flex-wrap:wrap; gap:.5rem; margin:.5rem 0; }
+      .editor-area { border:1px solid #e5e7eb; border-radius:10px; padding:1rem; min-height:240px; line-height:1.6; }
+      .editor-area:focus { outline: 2px solid #e5e7eb; }
+      .editor-area.empty:before { content: attr(data-placeholder); color:#9ca3af; }
+      .posts-list { margin-top: 2rem; }
+      .post-item { padding:.5rem 0; border-bottom:1px solid #eee; }
+    </style>
   </head>
-  <body></body>
+  <body>
+    <nav class="topbar shell">
+      <div class="brand"><span class="flag"></span><a href="/">Static Liberal</a></div>
+      <div class="menu">
+        <a class="btn" href="/">Home</a>
+        <span id="user-pill" class="pill hidden"></span>
+        <button id="sign-out" class="btn hidden">Sign out</button>
+      </div>
+    </nav>
+
+    <div class="admin">
+      <h1 style="margin: .5rem 0 1rem">Content Manager</h1>
+      <div class="muted" id="user-info">Checking access…</div>
+  <div id="auth-error" class="danger" style="margin:.5rem 0 0 0"></div>
+
+      <section id="editor" class="hidden card" style="margin-top:1rem;">
+        <h2 style="margin-top:0">Create / Edit Post</h2>
+        <form id="post-form">
+          <input type="hidden" id="post-id" />
+          <label for="title">Title</label>
+          <input id="title" type="text" placeholder="Post title" required />
+          <label for="date">Date</label>
+          <input id="date" type="date" required />
+          <label>Body</label>
+          <div id="md-toolbar" class="toolbar">
+            <button type="button" data-action="bold" title="Bold"><strong>B</strong></button>
+            <button type="button" data-action="italic" title="Italic"><em>I</em></button>
+            <button type="button" data-action="underline" title="Underline"><span style="text-decoration:underline;">U</span></button>
+            <span class="muted">|</span>
+            <button type="button" data-action="h1" title="Heading 1">H1</button>
+            <button type="button" data-action="h2" title="Heading 2">H2</button>
+            <button type="button" data-action="h3" title="Heading 3">H3</button>
+            <span class="muted">|</span>
+            <button type="button" data-action="ul" title="Bulleted list">• List</button>
+            <button type="button" data-action="ol" title="Numbered list">1. List</button>
+            <button type="button" data-action="quote" title="Quote">“Quote”</button>
+            <span class="muted">|</span>
+            <button type="button" data-action="link" title="Insert link">Link</button>
+            <button type="button" data-action="image" title="Insert image">Image</button>
+            <button type="button" data-action="code" title="Inline code">Inline `code`</button>
+            <button type="button" data-action="codeblock" title="Code block">Code block</button>
+          </div>
+          <div id="editor-area" class="editor-area" contenteditable="true" data-placeholder="Write your post…"></div>
+          <div class="row">
+            <button type="submit">Save</button>
+            <button id="reset" type="button">Reset</button>
+            <button id="delete" type="button" class="danger hidden">Delete</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="posts-list">
+        <h2>All Posts</h2>
+        <div id="posts"></div>
+      </section>
+    </div>
+
+    <!-- Turndown (HTML -> Markdown) as classic script for global TurndownService -->
+    <script src="https://cdn.jsdelivr.net/npm/turndown/dist/turndown.js"></script>
+    <script type="module">
+      import { db, auth, provider, signInWithPopup, signOut, onAuthStateChanged, ADMIN_EMAIL } from '../assets/firebase.js';
+      import { signInWithRedirect, getRedirectResult } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+      import { marked } from 'https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js';
+      import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, getDocs, getDoc, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+      const userInfo = document.getElementById('user-info');
+  const signOutBtn = document.getElementById('sign-out');
+  const userPill = document.getElementById('user-pill');
+  const editor = document.getElementById('editor');
+  const authError = document.getElementById('auth-error');
+      const postsEl = document.getElementById('posts');
+      const form = document.getElementById('post-form');
+      const postIdEl = document.getElementById('post-id');
+      const titleEl = document.getElementById('title');
+      const dateEl = document.getElementById('date');
+      const editorEl = document.getElementById('editor-area');
+      const resetBtn = document.getElementById('reset');
+      const deleteBtn = document.getElementById('delete');
+      const toolbarEl = document.getElementById('md-toolbar');
+      const turndown = new window.TurndownService({ codeBlockStyle: 'fenced' });
+
+      // WYSIWYG toolbar using execCommand for simplicity
+      function cmd(command, value = null) {
+        editorEl.focus();
+        document.execCommand(command, false, value);
+      }
+      function insertCodeInline() {
+        const sel = document.getSelection();
+        const text = sel && sel.toString() ? sel.toString() : 'code';
+        cmd('insertHTML', `<code>${escapeHtml(text)}</code>`);
+      }
+      function insertCodeBlock() {
+        const sel = document.getSelection();
+        const text = sel && sel.toString() ? sel.toString() : 'code';
+        cmd('insertHTML', `<pre><code>${escapeHtml(text)}</code></pre>`);
+      }
+      function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+      editorEl.addEventListener('paste', (e) => {
+        // Keep it clean: paste as plain text to avoid messy HTML
+        e.preventDefault();
+        const text = e.clipboardData.getData('text/plain');
+        cmd('insertText', text);
+      });
+      editorEl.addEventListener('input', () => {
+        editorEl.classList.toggle('empty', editorEl.textContent.trim().length === 0);
+      });
+      toolbarEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        const action = btn.getAttribute('data-action');
+        switch (action) {
+          case 'bold': cmd('bold'); break;
+          case 'italic': cmd('italic'); break;
+          case 'underline': cmd('underline'); break;
+          case 'h1': cmd('formatBlock', '<h1>'); break;
+          case 'h2': cmd('formatBlock', '<h2>'); break;
+          case 'h3': cmd('formatBlock', '<h3>'); break;
+          case 'ul': cmd('insertUnorderedList'); break;
+          case 'ol': cmd('insertOrderedList'); break;
+          case 'quote': cmd('formatBlock', '<blockquote>'); break;
+          case 'link': {
+            const url = prompt('Enter URL');
+            if (url) cmd('createLink', url);
+            break;
+          }
+          case 'image': {
+            const url = prompt('Enter image URL');
+            if (url) cmd('insertImage', url);
+            break;
+          }
+          case 'code': insertCodeInline(); break;
+          case 'codeblock': insertCodeBlock(); break;
+        }
+      });
+
+      function slugify(str) {
+        return str
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, '')
+          .trim()
+          .replace(/\s+/g, '-')
+          .replace(/-+/g, '-');
+      }
+
+  async function refreshList() {
+        postsEl.innerHTML = 'Loading...';
+        const q = query(collection(db, 'posts'), orderBy('date', 'desc'));
+        const snap = await getDocs(q);
+        if (snap.empty) {
+          postsEl.innerHTML = '<p class="muted">No posts yet.</p>';
+          return;
+        }
+        postsEl.innerHTML = '';
+        snap.forEach(d => {
+          const p = d.data();
+          const div = document.createElement('div');
+          div.className = 'post-item';
+          const dateStr = p.date?.toDate ? p.date.toDate().toISOString().slice(0,10) : (p.date || '');
+          div.innerHTML = `
+            <strong>${p.title || '(untitled)'}</strong>
+            <span class="muted"> — ${dateStr}</span>
+            <div class="row" style="margin-top:.25rem">
+              <a href="../post.html?id=${d.id}" target="_blank">View</a>
+              <button data-id="${d.id}" class="edit">Edit</button>
+            </div>
+          `;
+          div.querySelector('.edit').addEventListener('click', async () => {
+            const dd = await getDoc(doc(db, 'posts', d.id));
+            const data = dd.data();
+            postIdEl.value = d.id;
+            titleEl.value = data.title || '';
+            const dateVal = data.date?.toDate ? data.date.toDate().toISOString().slice(0,10) : (data.date || '');
+            dateEl.value = dateVal;
+            editorEl.innerHTML = marked.parse(data.body || '');
+            editorEl.classList.toggle('empty', editorEl.textContent.trim().length === 0);
+            deleteBtn.classList.remove('hidden');
+            editor.scrollIntoView({ behavior: 'smooth' });
+          });
+          postsEl.appendChild(div);
+        });
+      }
+
+      function ensureAdmin(user) {
+        if (!user || user.email !== ADMIN_EMAIL) {
+          throw new Error('forbidden:not-admin');
+        }
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try { ensureAdmin(auth.currentUser); } catch (err) { alert('You are not authorized to perform this action.'); return; }
+        const html = editorEl.innerHTML;
+        const bodyMd = turndown.turndown(html);
+        const payload = {
+          title: titleEl.value.trim(),
+          slug: slugify(titleEl.value || ''),
+          date: new Date(dateEl.value),
+          body: bodyMd,
+          updatedAt: serverTimestamp(),
+        };
+        const id = postIdEl.value;
+        if (id) {
+          await updateDoc(doc(db, 'posts', id), payload);
+        } else {
+          payload.createdAt = serverTimestamp();
+          await addDoc(collection(db, 'posts'), payload);
+        }
+  form.reset();
+        postIdEl.value = '';
+        deleteBtn.classList.add('hidden');
+  editorEl.innerHTML = '';
+  editorEl.classList.add('empty');
+        await refreshList();
+      });
+
+      resetBtn.addEventListener('click', () => {
+        form.reset();
+        postIdEl.value = '';
+        deleteBtn.classList.add('hidden');
+        editorEl.innerHTML = '';
+        editorEl.classList.add('empty');
+      });
+
+      deleteBtn.addEventListener('click', async () => {
+        try { ensureAdmin(auth.currentUser); } catch (err) { alert('You are not authorized to perform this action.'); return; }
+        const id = postIdEl.value;
+        if (!id) return;
+        if (!confirm('Delete this post?')) return;
+        await deleteDoc(doc(db, 'posts', id));
+        form.reset();
+        postIdEl.value = '';
+        deleteBtn.classList.add('hidden');
+        await refreshList();
+      });
+
+      signOutBtn.addEventListener('click', async () => {
+        await signOut(auth);
+      });
+
+      // Handle redirect result (no-op if none)
+      getRedirectResult(auth).catch((e) => {
+        console.error('Redirect result error:', e);
+        authError.textContent = `${e.code || 'auth/error'}: ${e.message || ''}`;
+      });
+
+    onAuthStateChanged(auth, (user) => {
+        if (user && user.email === ADMIN_EMAIL) {
+          userInfo.textContent = `Signed in as ${user.displayName || user.email}`;
+      userPill.textContent = user.email || 'Signed in';
+      userPill.classList.remove('hidden');
+          signOutBtn.classList.remove('hidden');
+          editor.classList.remove('hidden');
+          authError.textContent = '';
+          refreshList();
+        } else {
+          // Redirect all non-admin or signed-out users to the homepage
+          window.location.href = '/';
+        }
+      });
+    </script>
+  </body>
 </html>
